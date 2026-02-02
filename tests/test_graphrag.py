@@ -121,6 +121,50 @@ class TestGraphDBConnector(unittest.TestCase):
                 subject_contains="test",
             )
 
+    @patch.object(GraphDBConnector, 'execute_sparql')
+    def test_get_triples_from_graph_with_single_filter(self, mock_execute):
+        """Test get_triples_from_graph with a single predicate filter."""
+        mock_execute.return_value = []
+        
+        # Call the method with a single filter string
+        self.connector.get_triples_from_graph(
+            graph_uri="http://example.com/graph",
+            predicate_filter="rdfs:subClassOf",
+        )
+        
+        # Verify the SPARQL query contains the filter
+        call_args = mock_execute.call_args[0][0]
+        self.assertIn('FILTER(CONTAINS(LCASE(STR(?p)), LCASE("rdfs:subClassOf")))', call_args)
+
+    @patch.object(GraphDBConnector, 'execute_sparql')
+    def test_get_triples_from_graph_with_list_filter(self, mock_execute):
+        """Test get_triples_from_graph with multiple predicate filters."""
+        mock_execute.return_value = []
+        
+        # Call the method with a list of filters
+        self.connector.get_triples_from_graph(
+            graph_uri="http://example.com/graph",
+            predicate_filter=["rdfs:subClassOf", "rdfs:hasValue"],
+        )
+        
+        # Verify the SPARQL query contains both filters with OR condition
+        call_args = mock_execute.call_args[0][0]
+        self.assertIn('FILTER(CONTAINS(LCASE(STR(?p)), LCASE("rdfs:subClassOf")) || CONTAINS(LCASE(STR(?p)), LCASE("rdfs:hasValue")))', call_args)
+
+    @patch.object(GraphDBConnector, 'execute_sparql')
+    def test_get_triples_from_graph_no_filter(self, mock_execute):
+        """Test get_triples_from_graph with no predicate filter."""
+        mock_execute.return_value = []
+        
+        # Call the method without a filter
+        self.connector.get_triples_from_graph(
+            graph_uri="http://example.com/graph",
+        )
+        
+        # Verify the SPARQL query does not contain a FILTER clause
+        call_args = mock_execute.call_args[0][0]
+        self.assertNotIn('FILTER', call_args)
+
 
 class TestQueryAnalyzer(unittest.TestCase):
     """Tests for the QueryAnalyzer class."""
@@ -181,7 +225,18 @@ class TestQueryAnalyzer(unittest.TestCase):
         self.assertEqual(result["wood_type"], "oak")
         self.assertEqual(result["graph_uri"], "http://w2w_onto.com/init/oak")
         self.assertEqual(result["property_type"], "material_properties")
-        self.assertIsNotNone(result["predicate_filter"])
+        # When property_type is detected, predicate_filter is set to the property type
+        self.assertEqual(result["predicate_filter"], "material properties")
+
+    def test_analyze_query_default_predicate_filter(self):
+        """Test that predicate_filter defaults to rdfs:subClassOf and rdfs:hasValue."""
+        result = self.analyzer.analyze_query("Tell me about oak")
+        
+        self.assertEqual(result["wood_type"], "oak")
+        self.assertEqual(result["graph_uri"], "http://w2w_onto.com/init/oak")
+        self.assertIsNone(result["property_type"])
+        # Default predicate filter should be set
+        self.assertEqual(result["predicate_filter"], ["rdfs:subClassOf", "rdfs:hasValue"])
 
     def test_analyze_query_no_wood_type(self):
         """Test query analysis when no wood type is found."""
@@ -189,6 +244,8 @@ class TestQueryAnalyzer(unittest.TestCase):
         
         self.assertIsNone(result["wood_type"])
         self.assertIsNone(result["graph_uri"])
+        # Default predicate filter should still be set
+        self.assertEqual(result["predicate_filter"], ["rdfs:subClassOf", "rdfs:hasValue"])
 
     def test_add_wood_type(self):
         """Test adding a new wood type."""

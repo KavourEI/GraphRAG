@@ -102,7 +102,7 @@ class GraphDBConnector:
     def get_triples_from_graph(
         self,
         graph_uri: str,
-        predicate_filter: Optional[str] = None,
+        predicate_filter: Optional[str | list[str]] = None,
         limit: int = 100,
     ) -> list[dict]:
         """
@@ -110,7 +110,8 @@ class GraphDBConnector:
 
         Args:
             graph_uri: The URI of the named graph to query.
-            predicate_filter: Optional filter string to match predicates.
+            predicate_filter: Optional filter string or list of strings to match predicates.
+                             If a list is provided, predicates matching any of the filters will be included.
             limit: Maximum number of results to return.
 
         Returns:
@@ -118,8 +119,14 @@ class GraphDBConnector:
         """
         filter_clause = ""
         if predicate_filter:
-            # Filter predicates containing the specified string (case-insensitive)
-            filter_clause = f'FILTER(CONTAINS(LCASE(STR(?p)), LCASE("{predicate_filter}")))'
+            # Handle both single string and list of strings
+            if isinstance(predicate_filter, str):
+                # Single filter: use CONTAINS
+                filter_clause = f'FILTER(CONTAINS(LCASE(STR(?p)), LCASE("{predicate_filter}")))'
+            elif isinstance(predicate_filter, list) and predicate_filter:
+                # Multiple filters: use OR condition with CONTAINS
+                conditions = [f'CONTAINS(LCASE(STR(?p)), LCASE("{f}"))' for f in predicate_filter]
+                filter_clause = f'FILTER({" || ".join(conditions)})'
 
         query = f"""
         SELECT ?s ?p ?o
