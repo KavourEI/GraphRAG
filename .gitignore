@@ -74,3 +74,4 @@ venv.bak/
 # Temporary files
 tmp/
 temp/
+test_improvements.py

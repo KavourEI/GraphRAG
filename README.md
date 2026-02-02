@@ -11,8 +11,13 @@ This project implements a knowledge graph-based question answering system that:
 
 - **GraphDB Integration**: Connect to GraphDB (Ontotext) and execute SPARQL queries
 - **Query Analysis**: Automatically identify relevant graphs and predicates from natural language
+- **Count Queries**: Ask about available wood types and get graph-based counts
 - **Semantic Search**: Use embeddings for relevance-based filtering of retrieved data
 - **LLM Response Generation**: Generate natural language answers using Ollama
+- **Hallucination Prevention**: Strict context adherence prevents making up information
+  - System prompts enforce ONLY using provided context
+  - Lower temperature (0.3) reduces creative hallucination
+  - Clear "I don't know" responses when data is missing
 
 ## Installation
 
@@ -75,6 +80,21 @@ answer = get_answer_from_graphdb(
     query="What are the material properties of oak tree?",
 )
 print(answer)
+```
+
+### Querying Available Wood Types
+
+The system now supports general queries about available wood types/graphs:
+
+```python
+from graphrag import get_answer_from_graphdb
+
+# Ask about available wood types
+answer = get_answer_from_graphdb(
+    query="How many wood types do you have information about?",
+)
+print(answer)
+# Output: "I have information about 10 wood types (graphs) in the knowledge graph: ash, birch, cedar, cherry, maple, mahogany, oak, pine, teak, walnut."
 ```
 
 ### Custom Configuration
