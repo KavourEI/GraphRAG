@@ -8,7 +8,7 @@ about wood types and get natural language responses.
 Prerequisites:
 1. GraphDB (Ontotext) running at http://localhost:7200
 2. Ollama running at http://localhost:11434
-3. A repository named "wood_types" with wood data graphs
+3. A repository named "Final_W2W_Onto" with wood data graphs
 
 Usage:
     python example.py
@@ -68,7 +68,7 @@ def example_custom_configuration():
     # Create custom components
     graphdb = GraphDBConnector(
         endpoint_url="http://localhost:7200",
-        repository="wood_types",
+        repository="Final_W2W_Onto",
         timeout=60,
     )
 

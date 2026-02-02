@@ -37,7 +37,7 @@ class GraphRAGPipeline:
         query_analyzer: Optional[QueryAnalyzer] = None,
         ollama_client: Optional[OllamaClient] = None,
         graphdb_endpoint: str = "http://localhost:7200",
-        graphdb_repository: str = "wood_types",
+        graphdb_repository: str = "Final_W2W_Onto",
         ollama_url: str = "http://localhost:11434",
         embedding_model: str = "nomic-embed-text",
         llm_model: str = "llama3.2",
@@ -356,7 +356,7 @@ Please provide a helpful answer based on the context above."""
 def get_answer_from_graphdb(
     query: str,
     graphdb_endpoint: str = "http://localhost:7200",
-    graphdb_repository: str = "wood_types",
+    graphdb_repository: str = "Final_W2W_Onto",
     ollama_url: str = "http://localhost:11434",
     embedding_model: str = "nomic-embed-text",
     llm_model: str = "llama3.2",

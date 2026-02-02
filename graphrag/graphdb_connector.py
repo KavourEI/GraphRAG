@@ -26,7 +26,7 @@ class GraphDBConnector:
     def __init__(
         self,
         endpoint_url: str = "http://localhost:7200",
-        repository: str = "wood_types",
+        repository: str = "Final_W2W_Onto",
         username: Optional[str] = None,
         password: Optional[str] = None,
         timeout: int = 30,

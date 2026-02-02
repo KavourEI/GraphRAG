@@ -28,7 +28,7 @@ pip install -r requirements.txt
 ## Prerequisites
 
 1. **GraphDB (Ontotext)** running at `http://localhost:7200`
-   - Create a repository named `wood_types`
+   - Create a repository named `Final_W2W_Onto`
    - Load RDF data with wood type information
 
 2. **Ollama** running at `http://localhost:11434`
@@ -85,7 +85,7 @@ from graphrag import GraphRAGPipeline, GraphDBConnector, QueryAnalyzer, OllamaCl
 # Create custom components
 graphdb = GraphDBConnector(
     endpoint_url="http://localhost:7200",
-    repository="wood_types",
+    repository="Final_W2W_Onto",
 )
 
 analyzer = QueryAnalyzer()
@@ -168,7 +168,7 @@ Main function to get an answer from GraphDB using RAG.
 **Parameters:**
 - `query` (str): The user's natural language question
 - `graphdb_endpoint` (str): GraphDB endpoint URL (default: "http://localhost:7200")
-- `graphdb_repository` (str): GraphDB repository name (default: "wood_types")
+- `graphdb_repository` (str): GraphDB repository name (default: "Final_W2W_Onto")
 - `ollama_url` (str): Ollama API URL (default: "http://localhost:11434")
 - `embedding_model` (str): Ollama model for embeddings (default: "nomic-embed-text")
 - `llm_model` (str): Ollama model for response generation (default: "llama3.2")
