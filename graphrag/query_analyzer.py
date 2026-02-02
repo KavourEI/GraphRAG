@@ -146,7 +146,9 @@ class QueryAnalyzer:
                 - wood_type: The detected wood type (if any)
                 - graph_uri: The corresponding graph URI (if wood type found)
                 - property_type: The detected property type (if any)
-                - predicate_filter: Suggested predicate filter for SPARQL query
+                - predicate_filter: Suggested predicate filter for SPARQL query.
+                                   Defaults to ["rdfs:subClassOf", "rdfs:hasValue"],
+                                   overridden if property_type is detected.
         """
         wood_type = self.extract_wood_type(query)
         property_type = self.extract_property_type(query)
@@ -155,7 +157,7 @@ class QueryAnalyzer:
             "wood_type": wood_type,
             "graph_uri": self.get_graph_uri(wood_type) if wood_type else None,
             "property_type": property_type,
-            "predicate_filter": None,
+            "predicate_filter": ["rdfs:subClassOf", "rdfs:hasValue"],
             "search_terms": [],
         }
         
