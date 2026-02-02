@@ -10,6 +10,7 @@ from unittest.mock import Mock, MagicMock, patch
 from graphrag.query_analyzer import QueryAnalyzer
 from graphrag.ollama_client import OllamaClient
 from graphrag.graphdb_connector import GraphDBConnector
+from graphrag.rag_pipeline import GraphRAGPipeline
 
 
 class TestGraphDBConnector(unittest.TestCase):
@@ -237,6 +238,8 @@ class TestQueryAnalyzer(unittest.TestCase):
         self.assertIsNone(result["property_type"])
         # Default predicate filter should be set
         self.assertEqual(result["predicate_filter"], ["rdfs:subClassOf", "rdfs:hasValue"])
+        # Should not be a count query
+        self.assertFalse(result["is_general_count_query"])
 
     def test_analyze_query_no_wood_type(self):
         """Test query analysis when no wood type is found."""
@@ -246,6 +249,42 @@ class TestQueryAnalyzer(unittest.TestCase):
         self.assertIsNone(result["graph_uri"])
         # Default predicate filter should still be set
         self.assertEqual(result["predicate_filter"], ["rdfs:subClassOf", "rdfs:hasValue"])
+
+    def test_is_general_count_query_how_many(self):
+        """Test detection of 'how many wood types' query."""
+        result = self.analyzer.is_general_count_query("How many wood types do you have information about?")
+        self.assertTrue(result)
+
+    def test_is_general_count_query_list_all(self):
+        """Test detection of 'list all' query."""
+        result = self.analyzer.is_general_count_query("List all available wood types")
+        self.assertTrue(result)
+
+    def test_is_general_count_query_count_of(self):
+        """Test detection of 'count of' query."""
+        result = self.analyzer.is_general_count_query("What is the count of graphs?")
+        self.assertTrue(result)
+
+    def test_is_general_count_query_negative(self):
+        """Test that specific wood queries are not detected as count queries."""
+        result = self.analyzer.is_general_count_query("What are the properties of oak?")
+        self.assertFalse(result)
+
+    def test_is_general_count_query_only_count_pattern(self):
+        """Test that having only count pattern is not enough."""
+        result = self.analyzer.is_general_count_query("How many apples do you have?")
+        self.assertFalse(result)
+
+    def test_is_general_count_query_excludes_specific_wood(self):
+        """Test that queries about a specific wood type are not count queries."""
+        result = self.analyzer.is_general_count_query("How many oak trees are there?")
+        # Should be False because 'oak' is detected as a specific wood type
+        self.assertFalse(result)
+
+    def test_analyze_query_detects_count_query(self):
+        """Test that analyze_query properly sets is_general_count_query."""
+        result = self.analyzer.analyze_query("How many wood types are available?")
+        self.assertTrue(result["is_general_count_query"])
 
     def test_add_wood_type(self):
         """Test adding a new wood type."""
@@ -306,6 +345,171 @@ class TestOllamaClientUtils(unittest.TestCase):
         self.assertEqual(len(result), 2)
         # First result should be index 0 (most similar)
         self.assertEqual(result[0][0], 0)
+
+
+class TestGraphRAGPipeline(unittest.TestCase):
+    """Tests for the GraphRAGPipeline class."""
+
+    def setUp(self):
+        """Set up test fixtures."""
+        # Create mocked components
+        self.mock_graphdb = MagicMock(spec=GraphDBConnector)
+        self.mock_analyzer = MagicMock(spec=QueryAnalyzer)
+        self.mock_ollama = MagicMock(spec=OllamaClient)
+        
+        # Create pipeline with mocks
+        self.pipeline = GraphRAGPipeline(
+            graphdb_connector=self.mock_graphdb,
+            query_analyzer=self.mock_analyzer,
+            ollama_client=self.mock_ollama,
+            use_embeddings=False,
+        )
+
+    def test_get_answer_handles_count_query(self):
+        """Test that count queries are handled properly."""
+        # Setup: Make analyzer detect a count query
+        self.mock_analyzer.analyze_query.return_value = {
+            "wood_type": None,
+            "graph_uri": None,
+            "property_type": None,
+            "predicate_filter": ["rdfs:subClassOf", "rdfs:hasValue"],
+            "search_terms": [],
+            "is_general_count_query": True,
+        }
+        
+        # Setup: Mock the list_named_graphs to return some graphs
+        self.mock_graphdb.list_named_graphs.return_value = [
+            "http://w2w_onto.com/init/oak",
+            "http://w2w_onto.com/init/pine",
+            "http://w2w_onto.com/init/maple",
+        ]
+        
+        # Execute
+        result = self.pipeline.get_answer("How many wood types do you have?")
+        
+        # Verify
+        self.assertIn("3", result)
+        self.assertIn("graph", result.lower())
+        self.assertIn("oak", result)
+        self.assertIn("pine", result)
+        self.assertIn("maple", result)
+
+    def test_get_answer_count_query_fallback(self):
+        """Test count query fallback when database is unavailable."""
+        # Setup: Make analyzer detect a count query
+        self.mock_analyzer.analyze_query.return_value = {
+            "wood_type": None,
+            "graph_uri": None,
+            "property_type": None,
+            "predicate_filter": ["rdfs:subClassOf", "rdfs:hasValue"],
+            "search_terms": [],
+            "is_general_count_query": True,
+        }
+        self.mock_analyzer.wood_type_graphs = {"oak": "http://example.com/oak"}
+        
+        # Setup: Make database call fail
+        self.mock_graphdb.list_named_graphs.side_effect = Exception("Database error")
+        
+        # Execute
+        result = self.pipeline.get_answer("How many wood types?")
+        
+        # Verify: Should fallback to known types
+        self.assertIn("1", result)
+        self.assertIn("oak", result)
+
+    def test_generate_no_data_response(self):
+        """Test the response when no data is found."""
+        analysis = {
+            "wood_type": "oak",
+            "graph_uri": "http://w2w_onto.com/init/oak",
+        }
+        
+        result = self.pipeline._generate_no_data_response("What is oak?", analysis)
+        
+        # Verify the response indicates no data
+        self.assertIn("don't have information", result.lower())
+        self.assertIn("oak", result)
+
+    @patch.object(GraphRAGPipeline, '_retrieve_triples')
+    @patch.object(GraphRAGPipeline, '_generate_response')
+    def test_get_answer_normal_query(self, mock_generate, mock_retrieve):
+        """Test normal query flow when data is found."""
+        # Setup: Make analyzer return a normal query
+        self.mock_analyzer.analyze_query.return_value = {
+            "wood_type": "oak",
+            "graph_uri": "http://w2w_onto.com/init/oak",
+            "property_type": "material_properties",
+            "predicate_filter": "material properties",
+            "search_terms": ["material", "properties"],
+            "is_general_count_query": False,
+        }
+        
+        # Setup: Mock triples retrieval
+        mock_retrieve.return_value = [
+            {
+                "s": "http://example.com/oak#material_properties",
+                "p": "http://www.w3.org/2000/01/rdf-schema#hasValue",
+                "o": "High density wood",
+            }
+        ]
+        
+        # Setup: Mock response generation
+        mock_generate.return_value = "Oak has high density."
+        
+        # Execute
+        result = self.pipeline.get_answer("What are the material properties of oak?")
+        
+        # Verify
+        self.assertEqual(result, "Oak has high density.")
+        mock_retrieve.assert_called_once()
+        mock_generate.assert_called_once()
+
+    def test_get_answer_no_triples(self):
+        """Test behavior when no triples are found."""
+        # Setup: Make analyzer return a normal query
+        self.mock_analyzer.analyze_query.return_value = {
+            "wood_type": "oak",
+            "graph_uri": "http://w2w_onto.com/init/oak",
+            "property_type": None,
+            "predicate_filter": ["rdfs:subClassOf", "rdfs:hasValue"],
+            "search_terms": [],
+            "is_general_count_query": False,
+        }
+        
+        # Setup: Mock empty triples retrieval
+        with patch.object(self.pipeline, '_retrieve_triples', return_value=[]):
+            result = self.pipeline.get_answer("What is oak?")
+        
+        # Verify: Should return no data response
+        self.assertIn("don't have information", result.lower())
+
+    def test_system_prompt_prevents_hallucination(self):
+        """Test that the system prompt emphasizes strict adherence to context."""
+        # Setup
+        query = "What is oak?"
+        context = "Oak is a hardwood."
+        analysis = {"wood_type": "oak"}
+        
+        # Mock the ollama response
+        self.mock_ollama.generate_response.return_value = "Based on the context, oak is a hardwood."
+        
+        # Execute
+        result = self.pipeline._generate_response(query, context, analysis)
+        
+        # Verify that generate_response was called
+        self.mock_ollama.generate_response.assert_called_once()
+        
+        # Verify system prompt contains strict instructions
+        call_kwargs = self.mock_ollama.generate_response.call_args[1]
+        system_prompt = call_kwargs.get('system_prompt', '')
+        
+        self.assertIn("STRICTLY", system_prompt.upper())
+        self.assertIn("ONLY", system_prompt.upper())
+        self.assertIn("DO NOT", system_prompt.upper())
+        
+        # Verify temperature is low (to reduce hallucination)
+        temperature = call_kwargs.get('temperature', 1.0)
+        self.assertLess(temperature, 0.5, "Temperature should be low to prevent hallucination")
 
 
 if __name__ == "__main__":
