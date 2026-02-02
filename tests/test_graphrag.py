@@ -6,8 +6,120 @@ external services (GraphDB, Ollama).
 """
 
 import unittest
+from unittest.mock import Mock, MagicMock, patch
 from graphrag.query_analyzer import QueryAnalyzer
 from graphrag.ollama_client import OllamaClient
+from graphrag.graphdb_connector import GraphDBConnector
+
+
+class TestGraphDBConnector(unittest.TestCase):
+    """Tests for the GraphDBConnector class."""
+
+    def setUp(self):
+        """Set up test fixtures."""
+        self.connector = GraphDBConnector(
+            endpoint_url="http://localhost:7200",
+            repository="test_repo",
+        )
+
+    @patch.object(GraphDBConnector, 'execute_sparql')
+    def test_get_triples_by_subject(self, mock_execute):
+        """Test get_triples_by_subject method."""
+        # Mock the response
+        mock_execute.return_value = [
+            {
+                's': 'http://example.com/Traceability_of_parts',
+                'p': 'http://www.w3.org/1999/02/22-rdf-syntax-ns#type',
+                'o': 'http://www.w3.org/2002/07/owl#Class'
+            },
+            {
+                's': 'http://example.com/Traceability_of_parts',
+                'p': 'http://www.w3.org/2000/01/rdf-schema#hasValue',
+                'o': 'Plantation teak is traceable.'
+            },
+            {
+                's': 'http://example.com/Traceability_of_parts',
+                'p': 'http://www.w3.org/2000/01/rdf-schema#subClassOf',
+                'o': 'http://example.com/End_of_Life'
+            }
+        ]
+        
+        # Call the method
+        result = self.connector.get_triples_by_subject(
+            graph_uri="http://example.com/graph",
+            subject_contains="Traceability_of_parts",
+        )
+        
+        # Verify the results
+        self.assertEqual(len(result), 3)
+        self.assertEqual(result[0]['s'], 'http://example.com/Traceability_of_parts')
+        
+        # Verify the SPARQL query was called
+        mock_execute.assert_called_once()
+        
+        # Verify query contains expected filters
+        call_args = mock_execute.call_args[0][0]
+        self.assertIn('FILTER(CONTAINS(LCASE(STR(?s)), LCASE("Traceability_of_parts")))', call_args)
+        self.assertIn('SELECT ?s ?p ?o', call_args)
+
+    @patch.object(GraphDBConnector, 'execute_sparql')
+    def test_get_triples_by_subject_with_limit(self, mock_execute):
+        """Test get_triples_by_subject method with custom limit."""
+        mock_execute.return_value = []
+        
+        # Call the method with custom limit
+        self.connector.get_triples_by_subject(
+            graph_uri="http://example.com/graph",
+            subject_contains="test_subject",
+            limit=50,
+        )
+        
+        # Verify the SPARQL query contains the limit
+        call_args = mock_execute.call_args[0][0]
+        self.assertIn('LIMIT 50', call_args)
+
+    @patch.object(GraphDBConnector, 'execute_sparql')
+    def test_get_triples_by_subject_sanitizes_input(self, mock_execute):
+        """Test that get_triples_by_subject sanitizes input to prevent SPARQL injection."""
+        mock_execute.return_value = []
+        
+        # Call the method with potentially dangerous input
+        self.connector.get_triples_by_subject(
+            graph_uri="http://example.com/graph",
+            subject_contains='test"subject',
+        )
+        
+        # Verify the SPARQL query has escaped quotes
+        call_args = mock_execute.call_args[0][0]
+        self.assertIn('test\\"subject', call_args)
+        self.assertNotIn('test"subject', call_args.replace('test\\"subject', ''))
+
+    def test_get_triples_by_subject_validates_limit(self):
+        """Test that get_triples_by_subject validates limit parameter."""
+        # Test with negative limit
+        with self.assertRaises(ValueError):
+            self.connector.get_triples_by_subject(
+                graph_uri="http://example.com/graph",
+                subject_contains="test",
+                limit=-1,
+            )
+        
+        # Test with zero limit
+        with self.assertRaises(ValueError):
+            self.connector.get_triples_by_subject(
+                graph_uri="http://example.com/graph",
+                subject_contains="test",
+                limit=0,
+            )
+
+    def test_get_triples_by_subject_validates_graph_uri(self):
+        """Test that get_triples_by_subject validates graph_uri parameter."""
+        # Test with empty graph_uri
+        with self.assertRaises(ValueError):
+            self.connector.get_triples_by_subject(
+                graph_uri="",
+                subject_contains="test",
+            )
 
 
 class TestQueryAnalyzer(unittest.TestCase):

@@ -172,6 +172,53 @@ class GraphDBConnector:
         """
         return self.execute_sparql(query)
 
+    def get_triples_by_subject(
+        self,
+        graph_uri: str,
+        subject_contains: str,
+        limit: int = 100,
+    ) -> list[dict]:
+        """
+        Retrieve all triples where the subject contains a specific string.
+        
+        This retrieves ALL predicates and objects for matching subjects,
+        ensuring complete information retrieval.
+
+        Args:
+            graph_uri: The URI of the named graph to query.
+            subject_contains: String that the subject should contain.
+            limit: Maximum number of results to return.
+
+        Returns:
+            A list of dictionaries containing subject, predicate, and object.
+        """
+        # Validate limit parameter
+        if not isinstance(limit, int) or limit <= 0:
+            raise ValueError("limit must be a positive integer")
+        
+        # Sanitize input to prevent SPARQL injection
+        # Escape backslashes and quotes
+        sanitized_subject = subject_contains.replace("\\", "\\\\").replace('"', '\\"')
+        
+        # Graph URIs should be valid URIs - basic validation
+        if not graph_uri or not isinstance(graph_uri, str):
+            raise ValueError("graph_uri must be a non-empty string")
+        
+        query = f"""
+        PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+        PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+        PREFIX owl: <http://www.w3.org/2002/07/owl#>
+        
+        SELECT ?s ?p ?o
+        FROM <{graph_uri}>
+        WHERE {{
+            ?s ?p ?o .
+            FILTER(CONTAINS(LCASE(STR(?s)), LCASE("{sanitized_subject}")))
+        }}
+        LIMIT {limit}
+        """
+        return self.execute_sparql(query)
+
     def list_named_graphs(self) -> list[str]:
         """
         List all named graphs in the repository.

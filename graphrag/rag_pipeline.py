@@ -124,7 +124,17 @@ class GraphRAGPipeline:
         triples = []
 
         try:
-            # First, get triples with hasValue predicate (as specified in requirements)
+            # If a property type is identified, get ALL triples about that subject
+            if analysis.get("property_type"):
+                # Get all triples where this property is the subject
+                subject_triples = self.graphdb.get_triples_by_subject(
+                    graph_uri=graph_uri,
+                    subject_contains=analysis["property_type"],
+                )
+                triples.extend(subject_triples)
+                logger.info(f"Retrieved {len(subject_triples)} triples for subject containing '{analysis['property_type']}'")
+
+            # Also get triples with hasValue predicate (as specified in requirements)
             value_triples = self.graphdb.get_values_by_predicate(
                 graph_uri=graph_uri,
                 predicate_contains="hasValue",
