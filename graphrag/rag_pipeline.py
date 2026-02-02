@@ -86,6 +86,10 @@ class GraphRAGPipeline:
         # Step 1: Analyze the query to identify graph and predicates
         analysis = self.analyzer.analyze_query(query)
         
+        # Handle general count queries about available wood types/graphs
+        if analysis.get("is_general_count_query"):
+            return self._generate_count_response(query)
+        
         if not analysis["graph_uri"]:
             return self._generate_no_graph_response(query)
 
@@ -294,28 +298,76 @@ class GraphRAGPipeline:
             A natural language response.
         """
         system_prompt = """You are a helpful assistant specializing in wood and material science. 
-You answer questions based on the provided knowledge graph data.
-Be concise, accurate, and helpful. If the context doesn't contain enough information 
-to fully answer the question, acknowledge this and provide what you can.
-Always base your answers on the provided context."""
+You answer questions STRICTLY based on the provided knowledge graph data.
+
+CRITICAL INSTRUCTIONS:
+- ONLY use information from the provided context to answer questions
+- If the context doesn't contain the information needed to answer the question, you MUST say "I don't have that information in my knowledge base"
+- DO NOT make up, infer, or assume any information that is not explicitly stated in the context
+- DO NOT use general knowledge about wood or materials that is not in the context
+- Be concise, accurate, and helpful with the information that IS available
+- If you can only partially answer the question based on the context, clearly state what you can answer and what you cannot"""
 
         prompt = f"""Context from Knowledge Graph:
 {context}
 
 User Question: {query}
 
-Please provide a helpful answer based on the context above."""
+Please provide a helpful answer based ONLY on the context above. If the context does not contain the information needed to answer the question, clearly state that you don't have that information."""
 
         try:
             response = self.ollama.generate_response(
                 prompt=prompt,
                 system_prompt=system_prompt,
-                temperature=0.7,
+                temperature=0.3,  # Lower temperature to reduce hallucination
             )
             return response
         except Exception as e:
             logger.error(f"Failed to generate response: {e}")
             return f"I apologize, but I encountered an error while generating the response: {e}"
+
+    def _generate_count_response(self, query: str) -> str:
+        """
+        Generate a response for queries about available wood types/graphs.
+
+        Args:
+            query: The user's query.
+
+        Returns:
+            A response with the count of available graphs/wood types.
+        """
+        try:
+            # Get all named graphs from the database
+            all_graphs = self.graphdb.list_named_graphs()
+            
+            # Filter graphs that match the wood type pattern
+            wood_graphs = [g for g in all_graphs if "/init/" in g]
+            
+            # Extract wood type names from graph URIs
+            wood_types = []
+            for graph in wood_graphs:
+                # Extract the wood type from URIs like "http://w2w_onto.com/init/oak"
+                if "/init/" in graph:
+                    wood_type = graph.split("/init/")[-1]
+                    wood_types.append(wood_type)
+            
+            count = len(wood_types)
+            
+            if count == 0:
+                return "I currently don't have information about any wood types in the knowledge graph."
+            elif count == 1:
+                return f"I have information about 1 wood type (graph) in the knowledge graph: {wood_types[0]}."
+            else:
+                wood_list = ", ".join(sorted(wood_types))
+                return f"I have information about {count} wood types (graphs) in the knowledge graph: {wood_list}."
+                
+        except Exception as e:
+            logger.error(f"Failed to retrieve graph count: {e}")
+            # Fallback to known wood types from analyzer
+            known_types = sorted(self.analyzer.wood_type_graphs.keys())
+            count = len(known_types)
+            wood_list = ", ".join(known_types)
+            return f"I have information about {count} wood types (graphs): {wood_list}. (Note: This is based on configured types; actual database may vary.)"
 
     def _generate_no_graph_response(self, query: str) -> str:
         """
@@ -347,9 +399,9 @@ Please provide a helpful answer based on the context above."""
         """
         wood_type = analysis.get("wood_type", "the specified wood")
         return (
-            f"I found the graph for {wood_type}, but couldn't retrieve "
-            f"relevant information for your specific question. "
-            f"The knowledge graph may not contain data about this topic."
+            f"I don't have information to answer your question about {wood_type}. "
+            f"While I found the graph for {wood_type}, it doesn't contain "
+            f"data relevant to your specific question."
         )
 
 

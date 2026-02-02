@@ -134,6 +134,44 @@ class QueryAnalyzer:
         
         return None
 
+    def is_general_count_query(self, query: str) -> bool:
+        """
+        Detect if the query is asking about how many wood types/graphs are available.
+
+        Args:
+            query: The user's natural language query.
+
+        Returns:
+            True if the query is asking for a count of available wood types/graphs.
+        """
+        query_lower = query.lower()
+        
+        # Patterns that indicate count/list queries
+        count_patterns = [
+            "how many",
+            "number of",
+            "count of",
+            "list all",
+            "what are all",
+            "show all",
+            "available",
+        ]
+        
+        # Subject patterns for wood types or graphs
+        subject_patterns = [
+            "wood type",
+            "type of wood",
+            "wood",
+            "graph",
+            "information",
+            "data",
+        ]
+        
+        has_count_pattern = any(pattern in query_lower for pattern in count_patterns)
+        has_subject_pattern = any(pattern in query_lower for pattern in subject_patterns)
+        
+        return has_count_pattern and has_subject_pattern
+
     def analyze_query(self, query: str) -> dict:
         """
         Analyze a user query and extract relevant information.
@@ -149,9 +187,11 @@ class QueryAnalyzer:
                 - predicate_filter: Suggested predicate filter for SPARQL query.
                                    Defaults to ["rdfs:subClassOf", "rdfs:hasValue"],
                                    overridden if property_type is detected.
+                - is_general_count_query: Whether this is a query about available graphs/wood types
         """
         wood_type = self.extract_wood_type(query)
         property_type = self.extract_property_type(query)
+        is_general_count = self.is_general_count_query(query)
         
         result = {
             "wood_type": wood_type,
@@ -159,6 +199,7 @@ class QueryAnalyzer:
             "property_type": property_type,
             "predicate_filter": ["rdfs:subClassOf", "rdfs:hasValue"],
             "search_terms": [],
+            "is_general_count_query": is_general_count,
         }
         
         # Add predicate filter based on property type
