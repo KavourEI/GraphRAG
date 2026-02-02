@@ -69,6 +69,16 @@ class QueryAnalyzer:
         self.wood_type_graphs = wood_type_graphs or DEFAULT_WOOD_TYPE_GRAPHS.copy()
         self.property_patterns = property_patterns or PROPERTY_PATTERNS.copy()
         self.graph_uri_template = graph_uri_template
+        
+        # Pre-compile regex patterns for wood types for better performance
+        self._wood_type_patterns: dict[str, re.Pattern] = {}
+        self._compile_wood_type_patterns()
+
+    def _compile_wood_type_patterns(self):
+        """Compile regex patterns for all known wood types."""
+        for wood_type in self.wood_type_graphs.keys():
+            pattern = rf'\b{re.escape(wood_type)}\b'
+            self._wood_type_patterns[wood_type] = re.compile(pattern, re.IGNORECASE)
 
     def extract_wood_type(self, query: str) -> Optional[str]:
         """
@@ -80,13 +90,9 @@ class QueryAnalyzer:
         Returns:
             The detected wood type, or None if not found.
         """
-        query_lower = query.lower()
-        
-        # Check for known wood types
-        for wood_type in self.wood_type_graphs.keys():
-            # Use word boundary matching to avoid partial matches
-            pattern = rf'\b{re.escape(wood_type)}\b'
-            if re.search(pattern, query_lower):
+        # Check for known wood types using pre-compiled patterns
+        for wood_type, pattern in self._wood_type_patterns.items():
+            if pattern.search(query):
                 logger.debug(f"Detected wood type: {wood_type}")
                 return wood_type
         
@@ -209,3 +215,7 @@ class QueryAnalyzer:
             self.wood_type_graphs[wood_type_lower] = self.graph_uri_template.format(
                 wood_type=wood_type_lower
             )
+        
+        # Compile regex pattern for the new wood type
+        pattern = rf'\b{re.escape(wood_type_lower)}\b'
+        self._wood_type_patterns[wood_type_lower] = re.compile(pattern, re.IGNORECASE)

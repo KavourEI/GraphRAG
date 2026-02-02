@@ -115,7 +115,10 @@ class GraphRAGPipeline:
             analysis: The query analysis result.
 
         Returns:
-            A list of triples from the knowledge graph.
+            A list of triple dictionaries with keys:
+                - 's': Subject URI
+                - 'p': Predicate URI
+                - 'o': Object value (literal or URI)
         """
         graph_uri = analysis["graph_uri"]
         triples = []
