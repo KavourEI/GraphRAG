@@ -192,6 +192,10 @@ class GraphDBConnector:
         Returns:
             A list of dictionaries containing subject, predicate, and object.
         """
+        # Sanitize input to prevent SPARQL injection
+        # Escape backslashes and quotes
+        sanitized_subject = subject_contains.replace("\\", "\\\\").replace('"', '\\"')
+        
         query = f"""
         PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
         PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
@@ -201,7 +205,7 @@ class GraphDBConnector:
         FROM <{graph_uri}>
         WHERE {{
             ?s ?p ?o .
-            FILTER(CONTAINS(LCASE(STR(?s)), LCASE("{subject_contains}")))
+            FILTER(CONTAINS(LCASE(STR(?s)), LCASE("{sanitized_subject}")))
         }}
         LIMIT {limit}
         """

@@ -78,6 +78,22 @@ class TestGraphDBConnector(unittest.TestCase):
         call_args = mock_execute.call_args[0][0]
         self.assertIn('LIMIT 50', call_args)
 
+    @patch.object(GraphDBConnector, 'execute_sparql')
+    def test_get_triples_by_subject_sanitizes_input(self, mock_execute):
+        """Test that get_triples_by_subject sanitizes input to prevent SPARQL injection."""
+        mock_execute.return_value = []
+        
+        # Call the method with potentially dangerous input
+        self.connector.get_triples_by_subject(
+            graph_uri="http://example.com/graph",
+            subject_contains='test"subject',
+        )
+        
+        # Verify the SPARQL query has escaped quotes
+        call_args = mock_execute.call_args[0][0]
+        self.assertIn('test\\"subject', call_args)
+        self.assertNotIn('test"subject', call_args.replace('test\\"subject', ''))
+
 
 class TestQueryAnalyzer(unittest.TestCase):
     """Tests for the QueryAnalyzer class."""
