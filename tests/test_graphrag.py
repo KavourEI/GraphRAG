@@ -94,6 +94,33 @@ class TestGraphDBConnector(unittest.TestCase):
         self.assertIn('test\\"subject', call_args)
         self.assertNotIn('test"subject', call_args.replace('test\\"subject', ''))
 
+    def test_get_triples_by_subject_validates_limit(self):
+        """Test that get_triples_by_subject validates limit parameter."""
+        # Test with negative limit
+        with self.assertRaises(ValueError):
+            self.connector.get_triples_by_subject(
+                graph_uri="http://example.com/graph",
+                subject_contains="test",
+                limit=-1,
+            )
+        
+        # Test with zero limit
+        with self.assertRaises(ValueError):
+            self.connector.get_triples_by_subject(
+                graph_uri="http://example.com/graph",
+                subject_contains="test",
+                limit=0,
+            )
+
+    def test_get_triples_by_subject_validates_graph_uri(self):
+        """Test that get_triples_by_subject validates graph_uri parameter."""
+        # Test with empty graph_uri
+        with self.assertRaises(ValueError):
+            self.connector.get_triples_by_subject(
+                graph_uri="",
+                subject_contains="test",
+            )
+
 
 class TestQueryAnalyzer(unittest.TestCase):
     """Tests for the QueryAnalyzer class."""

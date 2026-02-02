@@ -192,9 +192,17 @@ class GraphDBConnector:
         Returns:
             A list of dictionaries containing subject, predicate, and object.
         """
+        # Validate limit parameter
+        if not isinstance(limit, int) or limit <= 0:
+            raise ValueError("limit must be a positive integer")
+        
         # Sanitize input to prevent SPARQL injection
         # Escape backslashes and quotes
         sanitized_subject = subject_contains.replace("\\", "\\\\").replace('"', '\\"')
+        
+        # Graph URIs should be valid URIs - basic validation
+        if not graph_uri or not isinstance(graph_uri, str):
+            raise ValueError("graph_uri must be a non-empty string")
         
         query = f"""
         PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
