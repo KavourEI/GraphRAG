@@ -1,0 +1,8 @@
+# GraphRAG Dependencies
+# Core dependencies for the RAG pipeline
+
+# HTTP client for API calls
+requests>=2.28.0
+
+# Type hints support (for Python < 3.9)
+typing-extensions>=4.0.0
