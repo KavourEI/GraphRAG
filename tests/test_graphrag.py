@@ -275,6 +275,12 @@ class TestQueryAnalyzer(unittest.TestCase):
         result = self.analyzer.is_general_count_query("How many apples do you have?")
         self.assertFalse(result)
 
+    def test_is_general_count_query_excludes_specific_wood(self):
+        """Test that queries about a specific wood type are not count queries."""
+        result = self.analyzer.is_general_count_query("How many oak trees are there?")
+        # Should be False because 'oak' is detected as a specific wood type
+        self.assertFalse(result)
+
     def test_analyze_query_detects_count_query(self):
         """Test that analyze_query properly sets is_general_count_query."""
         result = self.analyzer.analyze_query("How many wood types are available?")

@@ -19,6 +19,11 @@ from graphrag.ollama_client import OllamaClient
 
 logger = logging.getLogger(__name__)
 
+# Pattern used to identify wood type graphs in the knowledge base
+# Each wood type has its own named graph with URIs following the pattern:
+# http://w2w_onto.com/init/{wood_type}
+WOOD_GRAPH_PATTERN = "/init/"
+
 
 class GraphRAGPipeline:
     """
@@ -341,15 +346,14 @@ Please provide a helpful answer based ONLY on the context above. If the context 
             all_graphs = self.graphdb.list_named_graphs()
             
             # Filter graphs that match the wood type pattern
-            wood_graphs = [g for g in all_graphs if "/init/" in g]
+            wood_graphs = [g for g in all_graphs if WOOD_GRAPH_PATTERN in g]
             
             # Extract wood type names from graph URIs
             wood_types = []
             for graph in wood_graphs:
                 # Extract the wood type from URIs like "http://w2w_onto.com/init/oak"
-                if "/init/" in graph:
-                    wood_type = graph.split("/init/")[-1]
-                    wood_types.append(wood_type)
+                wood_type = graph.split(WOOD_GRAPH_PATTERN)[-1]
+                wood_types.append(wood_type)
             
             count = len(wood_types)
             

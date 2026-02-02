@@ -94,7 +94,8 @@ answer = get_answer_from_graphdb(
     query="How many wood types do you have information about?",
 )
 print(answer)
-# Output: "I have information about 10 wood types (graphs) in the knowledge graph: ash, birch, cedar, cherry, maple, mahogany, oak, pine, teak, walnut."
+# Example output (actual results depend on your database contents):
+# "I have information about 10 wood types (graphs) in the knowledge graph: ash, birch, cedar, cherry, maple, mahogany, oak, pine, teak, walnut."
 ```
 
 ### Custom Configuration

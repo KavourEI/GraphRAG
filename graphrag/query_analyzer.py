@@ -146,6 +146,10 @@ class QueryAnalyzer:
         """
         query_lower = query.lower()
         
+        # If a specific wood type is mentioned, this is NOT a general count query
+        if self.extract_wood_type(query) is not None:
+            return False
+        
         # Patterns that indicate count/list queries
         count_patterns = [
             "how many",
@@ -158,13 +162,15 @@ class QueryAnalyzer:
         ]
         
         # Subject patterns for wood types or graphs
+        # More specific patterns to avoid false positives
         subject_patterns = [
             "wood type",
             "type of wood",
-            "wood",
+            "types of wood",
+            "wood species",
+            "species of wood",
             "graph",
-            "information",
-            "data",
+            "dataset",
         ]
         
         has_count_pattern = any(pattern in query_lower for pattern in count_patterns)
